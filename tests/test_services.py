@@ -1,30 +1,26 @@
-# -*- coding: utf-8 -*-
-
 import json
-import unittest
 
-import pandas as pd
-
-from src.services import transfers_to_individuals
+from src.services import transactions_by_phone_numbers
 
 
-class TestTransfersToIndividuals(unittest.TestCase):
-
-    def test_transfers_to_individuals(self) -> None:
-        data = {
-            "Категория": ["Переводы", "Переводы", "Расходы"],
-            "Описание": ["Перевод Ивану И.", "Перевод Петрову П.", "Оплата услуг"],
-        }
-        transactions = pd.DataFrame(data)
-
-        expected_output = json.dumps(
-            [
-                {"Категория": "Переводы", "Описание": "Перевод Ивану И."},
-                {"Категория": "Переводы", "Описание": "Перевод Петрову П."},
-            ],
-            ensure_ascii=False,
-            indent=4,
-        )
-
-        result = transfers_to_individuals(transactions)
-        self.assertEqual(result, expected_output)
+def test_transactions_by_phone_numbers(num_operations_list) -> None:
+    result = [
+        {
+            "Дата операции": "01.01.2021 18:08:23",
+            "Дата платежа": "01.01.2021",
+            "Номер карты": "*7197",
+            "Статус": "OK",
+            "Сумма операции": -815.68,
+            "Валюта операции": "RUB",
+            "Сумма платежа": -815.68,
+            "Валюта платежа": "RUB",
+            "Кэшбэк": "",
+            "Категория": "Супермаркеты",
+            "MCC": 5411.0,
+            "Описание": "Тинькофф Мобайл +7 995 555-55-55",
+            "Бонусы (включая кэшбэк)": 16,
+            "Округление на инвесткопилку": 0,
+            "Сумма операции с округлением": 815.68,
+        },
+    ]
+    assert transactions_by_phone_numbers(num_operations_list) == json.dumps(result, ensure_ascii=False)

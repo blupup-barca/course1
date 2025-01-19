@@ -1,25 +1,29 @@
-# -*- coding: utf-8 -*-
+from typing import Any
 from unittest.mock import mock_open, patch
 
 import pandas as pd
 
-from src.reports import spending_by_category
+from src.reports import recording_data, spending_by_category
 
 
-def test_spending_by_category(samp_transactions: pd.DataFrame) -> None:
-    df_transactions = pd.DataFrame(samp_transactions)
-    current_datetime = "20.04.2023 12:00:00"
-    category = "Еда"
+def test_spending_by_category(transactions: pd.DataFrame) -> None:
+    result_df = spending_by_category(transactions, "Супермаркеты", "2021-11-15 12:00:00")
+    assert len(result_df) == 3
 
-    mock_open_func = mock_open()
 
-    with patch("builtins.open", mock_open_func):
-        result = spending_by_category(df_transactions, category, current_datetime).to_dict(orient="records")
+def test_spending_by_category_no_data(transactions: pd.DataFrame) -> None:
+    result_df = spending_by_category(transactions, "Супермаркеты")
+    assert len(result_df) == 0
 
-    expected_result = [
-        {"Дата операции": "10.03.2023 12:00:00", "Категория": "Еда", "Сумма": 200},
-        {"Дата операции": "20.04.2023 12:00:00", "Категория": "Еда", "Сумма": 300},
-        ]
-    assert result == expected_result
 
-    mock_open_func.assert_called_once_with("../logs/log_file.json", "w", encoding="utf-8")
+@patch("builtins.open", new_callable=mock_open)
+def test_recording_data_decorator(mock_file: Any):
+    test_data = pd.DataFrame({"name": ["Alice", "Bob"], "age": [25, 30]})
+
+    @recording_data("test_report.json")
+    def function():
+        return test_data
+
+    returned_value = function()
+
+    pd.testing.assert_frame_equal(returned_value, test_data)

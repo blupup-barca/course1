@@ -1,26 +1,31 @@
-# -*- coding: utf-8 -*-
 import json
+import logging
+import os
 from datetime import datetime
-from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 import pandas as pd
-from dateutil.relativedelta import relativedelta
 
-from src.logger import setting_logger
+current_dir = os.path.dirname(os.path.abspath(__file__))
 
-logger = setting_logger("reports")
+rel_file_path = os.path.join(current_dir, "../logs/reports.log")
+abs_file_path = os.path.abspath(rel_file_path)
+
+logger = logging.getLogger("reports")
+logger.setLevel(logging.DEBUG)
+file_handler = logging.FileHandler(abs_file_path, "w", encoding="utf-8")
+file_formatter = logging.Formatter("%(asctime)s - %(funcName)s %(levelname)s: %(message)s")
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
 
 
-def save_to_file_decorator(filename: str = "../logs/log_file.json") -> Callable:
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+def recording_data(file_name: str = "default_report.json") -> Callable:
+    """Декоратор, который записывает в файл результат, который возвращает функция, формирующая отчет"""
+
+    def decorator(func) -> Callable:
+        def wrapper(*args, **kwargs) -> json:
             result = func(*args, **kwargs)
-            logger.info("Декоратор записывает полученный результат в файл.")
-            with open(filename, "w", encoding="utf-8") as file:
-                json.dump(result.to_dict("records"), file, ensure_ascii=False, indent=4)
-            logger.info("Декоратор успешно завершил свою работу.")
+            result.to_json(path_or_buf=file_name, orient="records", force_ascii=False, indent=4)
             return result
 
         return wrapper
@@ -28,23 +33,18 @@ def save_to_file_decorator(filename: str = "../logs/log_file.json") -> Callable:
     return decorator
 
 
-@save_to_file_decorator("../logs/log_file.json")
+@recording_data()
 def spending_by_category(transactions: pd.DataFrame, category: str, date: Optional[str] = None) -> pd.DataFrame:
-    """Функция, возвращающая транзакции за 3 месяца по определенной категории."""
+    """Возвращает траты по заданной категории за последние три месяца (от переданной даты)"""
+    logger.info("Ищем траты по конкретной категории")
     if date is None:
-        end_date = datetime.now().date()
-    else:
-        end_date = datetime.strptime(date, "%d.%m.%Y %H:%M:%S")
-    start_date = end_date - relativedelta(months=3)
-
-    transactions["Дата операции"] = pd.to_datetime(transactions["Дата операции"], format="%d.%m.%Y %H:%M:%S")
-    sorted_transactions_by_date = transactions[
-        (transactions["Дата операции"] >= start_date) & (transactions["Дата операции"] <= end_date)
+        date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    date = datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
+    three_months_ago = date - pd.DateOffset(months=3)
+    transactions["Дата платежа"] = pd.to_datetime(transactions["Дата платежа"], format="%d.%m.%Y")
+    filtered_operations = transactions[
+        (transactions["Категория"] == category)
+        & (three_months_ago <= transactions["Дата платежа"])
+        & (transactions["Дата платежа"] <= date)
     ]
-    pd.options.mode.chained_assignment = None
-    sorted_transactions_by_date["Дата операции"] = sorted_transactions_by_date["Дата операции"].dt.strftime(
-        "%d.%m.%Y %H:%M:%S"
-    )
-    sorted_transactions_by_category = sorted_transactions_by_date[sorted_transactions_by_date["Категория"] == category]
-    print(sorted_transactions_by_category)
-    return sorted_transactions_by_category
+    return filtered_operations
